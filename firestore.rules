@@ -1,0 +1,91 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Catch-All Global Default-Deny Security Guard
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper Primitives
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && (request.auth.token.email_verified == true || request.auth.token.firebase.sign_in_provider == 'google.com');
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Bookings collection validation & rules
+    match /bookings/{bookingId} {
+      allow read, list: if isSignedIn() && (existing().userId == request.auth.uid);
+      
+      allow create: if isSignedIn() 
+                    && isValidId(bookingId)
+                    && isValidBooking(incoming())
+                    && incoming().userId == request.auth.uid
+                    && incoming().createdAt == request.time
+                    && incoming().status == 'pending';
+                    
+      allow update: if isSignedIn()
+                    && isValidId(bookingId)
+                    && isValidBooking(incoming())
+                    && existing().userId == request.auth.uid
+                    && incoming().userId == existing().userId
+                    && incoming().createdAt == existing().createdAt
+                    && (
+                      // User is allowed to cancel their reservation
+                      (incoming().status == 'cancelled' && incoming().diff(existing()).affectedKeys().hasOnly(['status']))
+                    );
+    }
+
+    // Quotes collection validation & rules
+    match /quotes/{quoteId} {
+      allow read: if isSignedIn() && (existing().userId == request.auth.uid);
+      
+      allow create: if isValidId(quoteId) 
+                    && isValidQuote(incoming())
+                    && incoming().createdAt == request.time
+                    && incoming().status == 'unread'
+                    && (!isSignedIn() || incoming().userId == request.auth.uid);
+    }
+
+    // Standalone Validation Blueprints
+    function isValidBooking(data) {
+      return data.keys().hasAll(['userId', 'serviceType', 'name', 'email', 'address', 'sqft', 'bookingDate', 'arrivalWindow', 'amount', 'createdAt', 'status'])
+             && data.keys().size() == 11
+             && data.userId is string && data.userId.size() <= 128
+             && data.serviceType is string && data.serviceType.size() <= 100
+             && data.name is string && data.name.size() <= 200
+             && data.email is string && data.email.size() <= 200
+             && data.address is string && data.address.size() <= 500
+             && data.sqft is string && data.sqft.size() <= 50
+             && data.bookingDate is string && data.bookingDate.size() <= 50
+             && data.arrivalWindow is string && data.arrivalWindow.size() <= 50
+             && data.amount is number && data.amount >= 0
+             && data.status in ['pending', 'confirmed', 'completed', 'cancelled'];
+    }
+
+    function isValidQuote(data) {
+      return data.keys().hasAll(['name', 'email', 'serviceType', 'details', 'createdAt', 'status'])
+             && (data.keys().size() == 6 || (data.keys().size() == 7 && data.keys().hasAll(['userId'])))
+             && data.name is string && data.name.size() <= 200
+             && data.email is string && data.email.size() <= 200
+             && data.serviceType is string && data.serviceType.size() <= 100
+             && data.details is string && data.details.size() <= 5000
+             && data.status in ['unread', 'contacted', 'archived']
+             && (!data.keys().contains('userId') || (data.userId is string && data.userId.size() <= 128));
+    }
+  }
+}

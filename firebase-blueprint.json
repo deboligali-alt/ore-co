@@ -1,0 +1,48 @@
+{
+  "entities": {
+    "Booking": {
+      "title": "Booking",
+      "description": "A scheduled premium cleaning booking.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "serviceType": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "address": { "type": "string" },
+        "sqft": { "type": "string" },
+        "bookingDate": { "type": "string" },
+        "arrivalWindow": { "type": "string" },
+        "amount": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["pending", "confirmed", "completed", "cancelled"] }
+      },
+      "required": ["userId", "serviceType", "name", "email", "address", "sqft", "bookingDate", "arrivalWindow", "amount", "createdAt", "status"]
+    },
+    "Quote": {
+      "title": "Quote",
+      "description": "A lead or general quote request submission.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "serviceType": { "type": "string" },
+        "details": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["unread", "contacted", "archived"] }
+      },
+      "required": ["name", "email", "serviceType", "details", "createdAt", "status"]
+    }
+  },
+  "firestore": {
+    "/bookings/{bookingId}": {
+      "schema": "Booking",
+      "description": "User scheduled cleaning reservations."
+    },
+    "/quotes/{quoteId}": {
+      "schema": "Quote",
+      "description": "Free quote or inquiry submissions."
+    }
+  }
+}
